@@ -1,4 +1,12 @@
 node_modules/
 .wwebjs_auth/
+
+# Credentials & Secrets (JANGAN PERNAH PUSH!)
 .env
+*.json
+!package.json
+!package-lock.json
+
+# Baileys Session (semua versi)
 auth_baileys/
+auth_baileys_*/
