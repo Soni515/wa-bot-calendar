@@ -13,7 +13,7 @@ const notion = new Client({ auth: process.env.NOTION_SECRET });
 const databaseId = process.env.NOTION_DATABASE_ID;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const spreadsheetId = process.env.SPREADSHEET_ID;
-const NOMOR_SONI = '6282136111625';
+const NOMOR_SONI = ['6282136111625', '96886526599416'];
 
 const auth = new google.auth.GoogleAuth({
     keyFile: './gen-lang-client-0136086078-4ace5bcc535b.json',
@@ -277,7 +277,7 @@ function formatDecisionLog(decisions) {
 let laporanMingguan_terakhir = null;
 
 async function kirimLaporanMingguan(sock) {
-    const nomorTujuan = `${NOMOR_SONI}@s.whatsapp.net`;
+    const nomorTujuan = `${NOMOR_SONI[0]}@s.whatsapp.net`;
     const today = new Date();
     const weekKey = `${today.getFullYear()}-W${Math.ceil(today.getDate() / 7)}`;
     if (laporanMingguan_terakhir === weekKey) return;
@@ -480,7 +480,7 @@ let intervalPengingat = null;
 let intervalLaporan = null;
 
 function jalankanPengingat(sock) {
-    const nomorTujuan = `${NOMOR_SONI}@s.whatsapp.net`;
+    const nomorTujuan = `${NOMOR_SONI[0]}@s.whatsapp.net`;
     if (intervalPengingat) clearInterval(intervalPengingat);
     console.log('⏰ Sistem pengingat aktif...');
     intervalPengingat = setInterval(async () => {
@@ -488,11 +488,23 @@ function jalankanPengingat(sock) {
             const { jadwalHarian, todoList } = await fetchNotionData();
             const sekarang = new Date();
             const items = [
-                ...jadwalHarian.map(i => ({ id: i.id, tipe: 'Jadwal', nama: i.kegiatan, waktu: i.waktuMulai })),
-                ...todoList.map(i => ({ id: i.id, tipe: 'To Do List', nama: i.tugas, waktu: i.tenggat }))
+                ...jadwalHarian.map(i => ({ id: i.id, tipe: 'Jadwal', nama: i.kegiatan, waktu: i.waktuMulai, waktuSelesai: i.waktuSelesai })),
+                ...todoList.map(i => ({ id: i.id, tipe: 'To Do List', nama: i.tugas, waktu: i.tenggat, waktuSelesai: null }))
             ];
             for (const item of items) {
                 if (!item.waktu) continue;
+
+                // --- AUTO HAPUS JIKA SUDAH TERLEWAT ---
+                const waktuBatas = item.waktuSelesai ? item.waktuSelesai : item.waktu;
+                const terlewatMenit = Math.round((sekarang.getTime() - waktuBatas.getTime()) / 60000);
+                
+                // Menghapus item jika sudah lewat 60 menit dari jadwal agar kegiatan yang sedang berjalan tidak hilang tiba-tiba
+                if (terlewatMenit >= 60) {
+                    await deleteNotionData(item.id);
+                    console.log(`[Auto Delete] Menghapus ${item.tipe} yang sudah kedaluwarsa: ${item.nama}`);
+                    continue; // Lanjut ke item berikutnya karena ini sudah dihapus
+                }
+
                 const mn = Math.round((item.waktu.getTime() - sekarang.getTime()) / 60000);
                 let wr = null;
                 if (mn >= 29 && mn <= 31 && !sudahDiingatkan.has(`${item.id}-30`)) wr = 30;
@@ -547,7 +559,7 @@ async function startBot() {
         if (!pesanTeks) return;
 
         const senderJid = msg.key.participant || msg.key.remoteJid;
-        if (!senderJid.startsWith(NOMOR_SONI)) return;
+        if (!NOMOR_SONI.some(n => senderJid.startsWith(n))) return;
 
         const pengirim = msg.key.remoteJid;
         console.log(`[Pesan Masuk] ${pesanTeks}`);
