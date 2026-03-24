@@ -219,7 +219,7 @@ Pesan Soni: "${pesan}"`;
         const result = await model.generateContent(prompt);
         let teks = result.response.text().trim();
 
-        // Bersihkan formatting markdown JSON jika ada
+        // Bersihkan formatting markdown JSON
         if (teks.startsWith('\`\`\`json')) teks = teks.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
         else if (teks.startsWith('\`\`\`')) teks = teks.replace(/\`\`\`/g, '').trim();
 

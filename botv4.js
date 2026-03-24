@@ -22,7 +22,7 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: 'v4', auth });
 
 // ================================================================
-// HELPER: FORMAT TANGGAL & JAM
+// FORMAT TANGGAL & JAM
 // ================================================================
 function formatTanggal(date) {
     const hari = date.toLocaleDateString('id-ID', { weekday: 'long' });
@@ -146,8 +146,13 @@ async function getFinancialSummary() {
     rows.slice(1).forEach(row => {
         const [, bulan, tipe, kategori, sifat, nominalStr, effortStr] = row;
         if (bulan !== bulanIni) return;
-        const nominal = parseFloat(nominalStr) || 0;
-        const effort = parseFloat(effortStr) || 0;
+
+        // Bersihkan format mata uang dari Google Sheets ("Rp2.307.000" menjadi "2307000")
+        const cleanNominal = String(nominalStr || '0').replace(/Rp/gi, '').replace(/\./g, '').trim().replace(',', '.');
+        const nominal = parseFloat(cleanNominal) || 0;
+
+        const cleanEffort = String(effortStr || '0').trim().replace(',', '.');
+        const effort = parseFloat(cleanEffort) || 0;
 
         if (tipe === 'Income') {
             totalIncome += nominal;
@@ -188,6 +193,12 @@ async function getFinancialSummary() {
 // ================================================================
 function calcFinancialScore(summary) {
     if (!summary) return { score: 0, label: 'Tidak Ada Data', mode: 'Survive' };
+
+    // Jika tidak ada transaksi sama sekali di bulan ini
+    if (summary.totalIncome === 0 && summary.totalExpense === 0) {
+        return { score: 0, label: 'Belum Ada Data', mode: 'Survive' };
+    }
+
     let score = 100;
     if (summary.cashflow < 0) score -= 40;
     else if (summary.cashflow < summary.totalIncome * 0.1) score -= 15;
